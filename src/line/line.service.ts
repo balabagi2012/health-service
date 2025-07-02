@@ -23,6 +23,14 @@ export class LineService {
     });
   }
 
+  async findOrCreateUser(userId: string) {
+    let user = await this.usersService.findOne(userId);
+    if (!user) {
+      user = await this.usersService.create({ lineId: userId });
+    }
+    return user;
+  }
+
   // 建立 Rich Menu
   async createRichMenu() {
     const richMenuObject = {
@@ -111,6 +119,58 @@ export class LineService {
     return null;
   }
 
+  // 發送填寫紀錄訊息
+  async sendHealthRecordsMessage(userId: string) {
+    const user = await this.findOrCreateUser(userId);
+    const initialSettingMessage = await this.createInitialSettingMessage(user);
+    if (initialSettingMessage) {
+      return await this.client.pushMessage(userId, [initialSettingMessage]);
+    }
+    const healthRecordsMessage = {
+      type: 'template' as const,
+      altText: '填寫紀錄',
+      template: {
+        type: 'buttons' as const,
+        title: '填寫紀錄',
+        text: '點擊下方按鈕紀錄',
+        actions: [
+          {
+            type: 'uri' as const,
+            label: `填寫${new Date().toISOString().split('T')[0]}紀錄`,
+            uri: `https://line.me/R/ti/p/@900qzqyj?date=${new Date().toISOString().split('T')[0]}`,
+          },
+        ],
+      },
+    };
+    return await this.client.pushMessage(userId, [healthRecordsMessage]);
+  }
+
+  // 發送歷史紀錄訊息
+  async sendHealthHistoryMessage(userId: string) {
+    const user = await this.findOrCreateUser(userId);
+    const initialSettingMessage = await this.createInitialSettingMessage(user);
+    if (initialSettingMessage) {
+      return await this.client.pushMessage(userId, [initialSettingMessage]);
+    }
+    const healthHistoryMessage = {
+      type: 'template' as const,
+      altText: '歷史紀錄',
+      template: {
+        type: 'buttons' as const,
+        title: '歷史紀錄',
+        text: '點擊下方按鈕查詢',
+        actions: [
+          {
+            type: 'uri' as const,
+            label: '查看歷史紀錄',
+            uri: 'https://line.me/R/ti/p/@900qzqyj',
+          },
+        ],
+      },
+    };
+    return await this.client.pushMessage(userId, [healthHistoryMessage]);
+  }
+
   // 發送歡迎訊息（多個訊息）
   async sendWelcomeMessages(userId: string) {
     const initialMessage = {
@@ -121,7 +181,6 @@ export class LineService {
 ✅ 記錄每日健康數值
 ✅ 查詢歷史健康紀錄
 ✅ 觀看衛教資源，學習照顧自己  
-✅ 設定提醒，提醒您每日紀錄  
 
 請點選下方的選單開始使用吧 👇`,
     };
@@ -130,14 +189,43 @@ export class LineService {
       initialMessage,
     ];
 
-    let user = await this.usersService.findOne(userId);
-    if (!user) {
-      user = await this.usersService.create({ lineId: userId });
-    }
+    const user = await this.findOrCreateUser(userId);
     const initialSettingMessage = await this.createInitialSettingMessage(user);
     if (initialSettingMessage) {
       messages.push(initialSettingMessage);
     }
     return this.client.pushMessage(userId, messages);
+  }
+
+  // 發送衛教資源模板消息
+  async sendHealthEducationResources(replyToken: string) {
+    const templateMessage = {
+      type: 'template' as const,
+      altText: '衛教資源',
+      template: {
+        type: 'buttons' as const,
+        title: '衛教資源',
+        text: '選擇您想了解的疾病衛教資訊',
+        actions: [
+          {
+            type: 'uri' as const,
+            label: '高血壓',
+            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9733',
+          },
+          {
+            type: 'uri' as const,
+            label: '高血脂',
+            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9734',
+          },
+          {
+            type: 'uri' as const,
+            label: '糖尿病',
+            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9735',
+          },
+        ],
+      },
+    };
+
+    return this.client.replyMessage(replyToken, templateMessage);
   }
 }

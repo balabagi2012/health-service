@@ -13,7 +13,7 @@ import { LineService } from './line.service';
 
 @Controller('webhook')
 export class LineController {
-  constructor(private readonly lineService: LineService) {}
+  constructor(private readonly lineService: LineService) { }
 
   @Post()
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
@@ -27,10 +27,21 @@ export class LineController {
         // 用戶加好友
         await this.lineService.sendWelcomeMessages(event.source.userId);
       } else if (event.type === 'message' && event.message.type === 'text') {
-        await this.lineService.replyText(
-          event.replyToken,
-          `你說了: ${event.message.text}`,
-        );
+        // 檢查是否為衛教資源相關訊息
+        if (event.message.text === '衛教資源' ||
+          event.message.text.includes('衛教') ||
+          event.message.text.includes('教育')) {
+          await this.lineService.sendHealthEducationResources(event.replyToken);
+        } else if (event.message.text === '填寫紀錄') {
+          await this.lineService.sendHealthRecordsMessage(event.source.userId);
+        } else if (event.message.text === '歷史紀錄') {
+          await this.lineService.sendHealthHistoryMessage(event.source.userId);
+        } else {
+          await this.lineService.replyText(
+            event.replyToken,
+            `已收到您的訊息，請稍後`,
+          );
+        }
       }
     }
 
