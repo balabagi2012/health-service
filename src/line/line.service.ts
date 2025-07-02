@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { Client, ClientConfig, RichMenu } from '@line/bot-sdk';
+import { Client, ClientConfig, Message, RichMenu } from '@line/bot-sdk';
 import { ConfigService } from '@nestjs/config';
+import { UsersService } from 'src/users/users.service';
+import { User } from 'src/users/users.schema';
 
 @Injectable()
 export class LineService {
   private client: Client;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private usersService: UsersService) {
     const config: ClientConfig = {
       channelAccessToken: this.configService.get('LINE_CHANNEL_ACCESS_TOKEN'),
       channelSecret: this.configService.get('LINE_CHANNEL_SECRET'),
@@ -85,22 +87,35 @@ export class LineService {
     return this.client.deleteRichMenu(richMenuId);
   }
 
-  // 發送歡迎訊息
-  async sendWelcomeMessage(userId: string) {
-    const welcomeMessage = {
-      type: 'text' as const,
-      text: '歡迎使用我們的 LINE Bot！\n\n請選擇以下功能：\n1. 查看服務\n2. 聯絡客服\n3. 設定選項',
-    };
-
-    return this.client.pushMessage(userId, welcomeMessage);
+  // 建立用戶綁定訊息
+  async createInitialSettingMessage(user: User) {
+    if (!user.name || !user.birthday || !user.gender || !user.height) {
+      const initialSettingMessage = {
+        type: 'template' as const,
+        altText: '用戶綁定',
+        template: {
+          type: 'buttons' as const,
+          title: '用戶綁定',
+          text: '點擊下方按鈕綁定',
+          actions: [
+            {
+              type: 'uri' as const,
+              label: '填寫資訊',
+              uri: 'https://line.me/R/ti/p/@900qzqyj',
+            },
+          ],
+        },
+      };
+      return initialSettingMessage;
+    }
+    return null;
   }
 
   // 發送歡迎訊息（多個訊息）
   async sendWelcomeMessages(userId: string) {
-    const messages = [
-      {
-        type: 'text' as const,
-        text: `您好！歡迎加入原健通，您的健康生活小幫手 🌿  
+    const initialMessage = {
+      type: 'text' as const,
+      text: `您好！歡迎加入原健通，您的健康生活小幫手 🌿  
 您可以透過我：
 
 ✅ 記錄每日健康數值
@@ -109,35 +124,20 @@ export class LineService {
 ✅ 設定提醒，提醒您每日紀錄  
 
 請點選下方的選單開始使用吧 👇`,
-      },
-      {
-        type: 'template' as const,
-        altText: '歡迎選單',
-        template: {
-          type: 'buttons' as const,
-          title: '請選擇服務',
-          text: '點擊下方按鈕開始使用',
-          actions: [
-            {
-              type: 'postback' as const,
-              label: '查詢資訊',
-              data: 'action=query_info',
-            },
-            {
-              type: 'postback' as const,
-              label: '預約服務',
-              data: 'action=book_service',
-            },
-            {
-              type: 'uri' as const,
-              label: '官方網站',
-              uri: 'https://example.com',
-            },
-          ],
-        },
-      },
+    };
+
+    const messages: Message[] = [
+      initialMessage,
     ];
 
+    let user = await this.usersService.findOne(userId);
+    if (!user) {
+      user = await this.usersService.create({ lineId: userId });
+    }
+    const initialSettingMessage = await this.createInitialSettingMessage(user);
+    if (initialSettingMessage) {
+      messages.push(initialSettingMessage);
+    }
     return this.client.pushMessage(userId, messages);
   }
 }
