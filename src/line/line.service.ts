@@ -3,12 +3,13 @@ import { Client, ClientConfig, Message, RichMenu } from '@line/bot-sdk';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/users.schema';
+import { RecordsService } from 'src/records/records.service';
 
 @Injectable()
 export class LineService {
   private client: Client;
 
-  constructor(private configService: ConfigService, private usersService: UsersService) {
+  constructor(private configService: ConfigService, private usersService: UsersService, private recordsService: RecordsService) {
     const config: ClientConfig = {
       channelAccessToken: this.configService.get('LINE_CHANNEL_ACCESS_TOKEN'),
       channelSecret: this.configService.get('LINE_CHANNEL_SECRET'),
@@ -97,7 +98,7 @@ export class LineService {
 
   // 建立用戶綁定訊息
   async createInitialSettingMessage(user: User) {
-    if (!user.name || !user.birthday || !user.gender || !user.height) {
+    if (!user.name || !user.birthday || !user.gender || !user.height || user.chronicIllness.length === 0) {
       const initialSettingMessage = {
         type: 'template' as const,
         altText: '用戶綁定',
@@ -109,7 +110,7 @@ export class LineService {
             {
               type: 'uri' as const,
               label: '填寫資訊',
-              uri: 'https://line.me/R/ti/p/@900qzqyj',
+              uri: `https://docs.google.com/forms/d/e/1FAIpQLSd4YqNRCmTUNrU5AO3vtUszrDm4TKRtta4nXSuhJ5GGOLyGrA/viewform?usp=pp_url&entry.505692859=${user.lineId}`,
             },
           ],
         },
@@ -120,59 +121,59 @@ export class LineService {
   }
 
   // 發送填寫紀錄訊息
-  async sendHealthRecordsMessage(userId: string) {
+  async sendHealthRecordsMessage(userId: string, replyToken: string) {
     const user = await this.findOrCreateUser(userId);
     const initialSettingMessage = await this.createInitialSettingMessage(user);
     if (initialSettingMessage) {
       return await this.client.pushMessage(userId, [initialSettingMessage]);
     }
+    
+    // 修復 URL 中的錯誤字符並正確編碼參數
+    const baseUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSfyayzwc6WBbalvmstSODxU8ujvWhUyXXvhzpL2Vwnv4gxFdA/viewform?usp=pp_url';
+    const lineIdParam = `&entry.1938784452=${encodeURIComponent(user.lineId)}`;
+    const chronicIllnessParams = user.chronicIllness.map(name => 
+      `&entry.1793505048=${encodeURIComponent(name)}`
+    ).join('');
+    const dateParam = `&entry.1458797072=${encodeURIComponent(new Date().toISOString().split('T')[0])}`;
+    
+    const link = baseUrl + lineIdParam + chronicIllnessParams + dateParam;
+    
     const healthRecordsMessage = {
       type: 'template' as const,
       altText: '填寫紀錄',
       template: {
         type: 'buttons' as const,
-        title: '填寫紀錄',
+        title: `填寫${new Date().toISOString().split('T')[0]}紀錄`,
         text: '點擊下方按鈕紀錄',
         actions: [
           {
             type: 'uri' as const,
-            label: `填寫${new Date().toISOString().split('T')[0]}紀錄`,
-            uri: `https://line.me/R/ti/p/@900qzqyj?date=${new Date().toISOString().split('T')[0]}`,
+            label: `立即填寫`,
+            uri: link, // 移除 encodeURIComponent，因為我們已經正確編碼了各個參數
           },
         ],
       },
     };
-    return await this.client.pushMessage(userId, [healthRecordsMessage]);
+    return await this.client.replyMessage(replyToken, [healthRecordsMessage]);
   }
 
   // 發送歷史紀錄訊息
-  async sendHealthHistoryMessage(userId: string) {
+  async sendHealthHistoryMessage(userId: string, replyToken: string) {
     const user = await this.findOrCreateUser(userId);
     const initialSettingMessage = await this.createInitialSettingMessage(user);
     if (initialSettingMessage) {
-      return await this.client.pushMessage(userId, [initialSettingMessage]);
+      return await this.client.replyMessage(replyToken, [initialSettingMessage]);
     }
+    const record = await this.recordsService.findLatestByUserId(userId);
     const healthHistoryMessage = {
-      type: 'template' as const,
-      altText: '歷史紀錄',
-      template: {
-        type: 'buttons' as const,
-        title: '歷史紀錄',
-        text: '點擊下方按鈕查詢',
-        actions: [
-          {
-            type: 'uri' as const,
-            label: '查看歷史紀錄',
-            uri: 'https://line.me/R/ti/p/@900qzqyj',
-          },
-        ],
-      },
+      type: 'text' as const,
+      text: JSON.stringify(record),
     };
-    return await this.client.pushMessage(userId, [healthHistoryMessage]);
+    return await this.client.replyMessage(replyToken, [healthHistoryMessage]);
   }
 
   // 發送歡迎訊息（多個訊息）
-  async sendWelcomeMessages(userId: string) {
+  async sendWelcomeMessages(userId: string, replyToken: string) {
     const initialMessage = {
       type: 'text' as const,
       text: `您好！歡迎加入原健通，您的健康生活小幫手 🌿  
@@ -194,7 +195,7 @@ export class LineService {
     if (initialSettingMessage) {
       messages.push(initialSettingMessage);
     }
-    return this.client.pushMessage(userId, messages);
+    return this.client.replyMessage(replyToken, messages);
   }
 
   // 發送衛教資源模板消息
@@ -227,5 +228,9 @@ export class LineService {
     };
 
     return this.client.replyMessage(replyToken, templateMessage);
+  }
+
+  async replyMessage(replyToken: string, messages: Message[]) {
+    return this.client.replyMessage(replyToken, messages);
   }
 }

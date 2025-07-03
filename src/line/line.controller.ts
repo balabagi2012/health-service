@@ -22,20 +22,25 @@ export class LineController {
     for (const event of events) {
       if (event.type === 'join') {
         // 用戶加入群組或聊天室
-        await this.lineService.sendWelcomeMessages(event.source.userId);
+        await this.lineService.sendWelcomeMessages(event.source.userId, event.replyToken);
       } else if (event.type === 'follow') {
         // 用戶加好友
-        await this.lineService.sendWelcomeMessages(event.source.userId);
+        await this.lineService.sendWelcomeMessages(event.source.userId, event.replyToken);
       } else if (event.type === 'message' && event.message.type === 'text') {
+        const user = await this.lineService.findOrCreateUser(event.source.userId);
+        const initialSettingMessage = await this.lineService.createInitialSettingMessage(user);
+        if (initialSettingMessage) {
+          return await this.lineService.replyMessage(event.replyToken, [initialSettingMessage]);
+        }
         // 檢查是否為衛教資源相關訊息
         if (event.message.text === '衛教資源' ||
           event.message.text.includes('衛教') ||
           event.message.text.includes('教育')) {
           await this.lineService.sendHealthEducationResources(event.replyToken);
-        } else if (event.message.text === '填寫紀錄') {
-          await this.lineService.sendHealthRecordsMessage(event.source.userId);
-        } else if (event.message.text === '歷史紀錄') {
-          await this.lineService.sendHealthHistoryMessage(event.source.userId);
+        } else if (event.message.text === '上傳紀錄') {
+          await this.lineService.sendHealthRecordsMessage(event.source.userId, event.replyToken);
+        } else if (event.message.text === '健康報告') {
+          await this.lineService.sendHealthHistoryMessage(event.source.userId, event.replyToken);
         } else {
           await this.lineService.replyText(
             event.replyToken,

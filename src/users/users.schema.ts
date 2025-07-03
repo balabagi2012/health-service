@@ -12,13 +12,16 @@ export class User {
   name: string;
 
   @Prop()
-  birthday?: string;
+  birthday: Date;
 
   @Prop()
   gender?: string;
 
   @Prop()
-  height?: string;
+  height: string;
+
+  @Prop()
+  chronicIllness: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User); 

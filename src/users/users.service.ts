@@ -27,9 +27,10 @@ export class UsersService {
   }
 
   async update(lineId: string, updateUserDto: Partial<User>): Promise<User> {
-    return this.userModel
+    const result = await this.userModel
       .findOneAndUpdate({ lineId }, updateUserDto, { new: true })
       .exec();
+    return result;
   }
 
   async remove(lineId: string): Promise<User> {
