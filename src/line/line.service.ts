@@ -237,18 +237,33 @@ export class LineService {
         actions: [
           {
             type: 'uri' as const,
-            label: '高血壓',
-            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9733',
+            label: '糖尿病',
+            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=糖尿病&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
           },
           {
             type: 'uri' as const,
             label: '高血脂',
-            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9734',
+            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=高血脂&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
           },
           {
             type: 'uri' as const,
-            label: '糖尿病',
-            uri: 'https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=571&pid=9735',
+            label: '高血壓',
+            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=高血壓&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
+          },
+          {
+            type: 'uri' as const,
+            label: '癌症',
+            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=癌症&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
+          },
+          {
+            type: 'uri' as const,
+            label: '心臟病',
+            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=心臟病&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
+          },
+          {
+            type: 'uri' as const,
+            label: '查詢其他健康資訊',
+            uri: 'https://health99.hpa.gov.tw/material',
           },
         ],
       },

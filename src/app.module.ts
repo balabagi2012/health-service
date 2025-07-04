@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { LineModule } from './line/line.module';
 import { UsersModule } from './users/users.module';
 import { RecordsModule } from './records/records.module';
+import { SystemConfigsModule } from './system-configs/system-configs.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RecordsModule } from './records/records.module';
     UsersModule,
     LineModule,
     RecordsModule,
+    SystemConfigsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

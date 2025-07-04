@@ -48,5 +48,5 @@ export class RecordsService {
         $lte: endDate,
       },
     }).sort({ recordDate: -1 }).exec();
-  }
+  }  
 } 

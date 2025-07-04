@@ -6,13 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { RecordsService } from './records.service';
 import { Record } from './records.schema';
 
 @Controller('records')
 export class RecordsController {
-  constructor(private readonly recordsService: RecordsService) {}
+  constructor(private readonly recordsService: RecordsService) { }
 
   @Post()
   create(@Body() createRecordDto: Partial<Record>) {
@@ -32,6 +33,11 @@ export class RecordsController {
   @Get('user/:userId')
   findByUserId(@Param('userId') userId: string) {
     return this.recordsService.findByUserId(userId);
+  }
+
+  @Get('user/:userId/date-range')
+  findByDateRange(@Param('userId') userId: string, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    return this.recordsService.findByDateRange(userId, new Date(startDate), new Date(endDate));
   }
 
   @Get('user/:userId/latest')
