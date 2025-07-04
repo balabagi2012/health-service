@@ -1,10 +1,21 @@
+import { Client, ClientConfig, FlexMessage, Message, RichMenu } from '@line/bot-sdk';
 import { Injectable } from '@nestjs/common';
-import { Client, ClientConfig, Message, RichMenu } from '@line/bot-sdk';
 import { ConfigService } from '@nestjs/config';
-import { UsersService } from 'src/users/users.service';
-import { User } from 'src/users/users.schema';
+import axios from 'axios';
+import { Record } from 'src/records/records.schema';
 import { RecordsService } from 'src/records/records.service';
+import { User } from 'src/users/users.schema';
+import { UsersService } from 'src/users/users.service';
+type HealthRecord = {
+  [key: string]: number | string;
+  '紀錄日期': string;
+};
 
+type ChartGroup = {
+  title: string;
+  fields: string[];
+  colors: string[];
+};
 @Injectable()
 export class LineService {
   private client: Client;
@@ -120,6 +131,153 @@ export class LineService {
     return null;
   }
 
+  async getShortChartUrl(chartConfig: any): Promise<string> {
+    const res = await axios.post('https://quickchart.io/chart/create', {
+      chart: chartConfig,
+      backgroundColor: 'white',
+      width: 500,
+      height: 325,
+      format: 'png',
+      devicePixelRatio: 2,
+
+    });
+
+    return res.data?.url || '';
+  }
+
+  async generateHealthChartFlexGrouped(records: HealthRecord[]) {
+    // 检查是否有数据
+    if (!records || records.length === 0) {
+      return {
+        type: 'text',
+        text: '目前沒有健康紀錄數據，請先上傳一些紀錄。'
+      };
+    }
+
+    const chartGroups: ChartGroup[] = [
+      {
+        title: '體重變化',
+        fields: ['體重（公斤）'],
+        colors: ['#FF6384']
+      },
+      {
+        title: '糖尿病指標',
+        fields: ['糖化血色素（HbA1c）', '血糖（mg/dL）'],
+        colors: ['#36A2EB', '#FFCE56']
+      },
+      {
+        title: '血壓變化',
+        fields: ['收縮壓（mmHg）', '舒張壓（mmHg）'],
+        colors: ['#4BC0C0', '#9966FF']
+      },
+      {
+        title: '血脂指標',
+        fields: ['三酸甘油脂（TG）', '高密度膽固醇（HDL）', '低密度膽固醇（LDL）'],
+        colors: ['#FF9F40', '#7CB342', '#C94D7C']
+      }
+    ];
+
+    const createChartUrl = async (title: string, fields: string[], colors: string[]): Promise<string> => {
+      const labels = records.map(r => r['紀錄日期']);
+      const datasets = fields.map((field, i) => ({
+        label: field,
+        data: records.map(r => Number(r[field] ?? 0)),
+        borderColor: colors[i],
+        fill: false
+      }));
+
+      const chartConfig = {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          title: { display: true, text: title },
+          scales: { y: { beginAtZero: true } }
+        }
+      };
+
+      try {
+        const chartUrl = await this.getShortChartUrl(chartConfig);
+        return chartUrl;
+      } catch (error) {
+        console.error('生成图表 URL 失败:', error);
+        return null;
+      }
+    };
+
+    const bubbles = await Promise.all(chartGroups.map(async group => {
+      const chartUrl = await createChartUrl(group.title, group.fields, group.colors);
+      
+      // 如果没有图表 URL，返回简单的文本 bubble
+      if (!chartUrl) {
+        return {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: group.title,
+                weight: 'bold',
+                size: 'lg',
+                align: 'center'
+              },
+              {
+                type: 'text',
+                text: '無法生成圖表，請稍後再試',
+                size: 'sm',
+                color: '#AAAAAA',
+                align: 'center',
+                margin: 'md'
+              }
+            ]
+          }
+        };
+      }
+
+      return {
+        type: 'bubble',
+        hero: {
+          type: 'image',
+          url: chartUrl,
+          size: 'full',
+          aspectRatio: '20:13', 
+          aspectMode: 'cover'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: group.title,
+              weight: 'bold',
+              size: 'lg',
+              align: 'center'
+            },
+            {
+              type: 'text',
+              text: '資料來源：原健署',
+              size: 'xs',
+              color: '#AAAAAA',
+              align: 'center',
+              margin: 'md'
+            }
+          ]
+        }
+      };
+    }));
+
+    return {
+      type: 'flex',
+      altText: '健康指標趨勢圖表',
+      contents: {
+        type: 'carousel',
+        contents: bubbles
+      }
+    };
+  }
+
   // 發送填寫紀錄訊息
   async sendHealthRecordsMessage(userId: string, replyToken: string) {
     const user = await this.findOrCreateUser(userId);
@@ -127,17 +285,17 @@ export class LineService {
     if (initialSettingMessage) {
       return await this.client.pushMessage(userId, [initialSettingMessage]);
     }
-    
+
     // 修復 URL 中的錯誤字符並正確編碼參數
     const baseUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSfyayzwc6WBbalvmstSODxU8ujvWhUyXXvhzpL2Vwnv4gxFdA/viewform?usp=pp_url';
     const lineIdParam = `&entry.1938784452=${encodeURIComponent(user.lineId)}`;
-    const chronicIllnessParams = user.chronicIllness.map(name => 
+    const chronicIllnessParams = user.chronicIllness.map(name =>
       `&entry.1793505048=${encodeURIComponent(name)}`
     ).join('');
     const dateParam = `&entry.1458797072=${encodeURIComponent(new Date().toISOString().split('T')[0])}`;
-    
+
     const link = baseUrl + lineIdParam + chronicIllnessParams + dateParam;
-    
+
     const healthRecordsMessage = {
       type: 'template' as const,
       altText: '填寫紀錄',
@@ -149,12 +307,28 @@ export class LineService {
           {
             type: 'uri' as const,
             label: `立即填寫`,
-            uri: link, // 移除 encodeURIComponent，因為我們已經正確編碼了各個參數
+            uri: link,
           },
         ],
       },
     };
     return await this.client.replyMessage(replyToken, [healthRecordsMessage]);
+  }
+
+
+
+  convertHealthRecordToChinese(record: Record) {
+    return {
+      '體重（公斤）': record.weight,
+      '糖化血色素（HbA1c）': record.hba1c,
+      '血糖（mg/dL）': record.bloodSugar,
+      '收縮壓（mmHg）': record.systolicPressure,
+      '舒張壓（mmHg）': record.diastolicPressure,
+      '低密度膽固醇（LDL）': record.ldl,
+      '高密度膽固醇（HDL）': record.hdl,
+      '三酸甘油脂（TG）': record.tg,
+      '紀錄日期': new Date(record.recordDate).toLocaleDateString('zh-TW'),
+    };
   }
 
   // 發送歷史紀錄訊息
@@ -164,12 +338,10 @@ export class LineService {
     if (initialSettingMessage) {
       return await this.client.replyMessage(replyToken, [initialSettingMessage]);
     }
-    const record = await this.recordsService.findLatestByUserId(userId);
-    const healthHistoryMessage = {
-      type: 'text' as const,
-      text: JSON.stringify(record),
-    };
-    return await this.client.replyMessage(replyToken, [healthHistoryMessage]);
+    const records = await this.recordsService.findByDateRange(userId, new Date(new Date().setDate(new Date().getDate() - 7)), new Date());
+    const healthData = records.map(record => this.convertHealthRecordToChinese(record));
+    const message = await this.generateHealthChartFlexGrouped(healthData) as FlexMessage;
+    return await this.client.replyMessage(replyToken, [message]);
   }
 
   // 發送歡迎訊息（多個訊息）
@@ -225,52 +397,88 @@ export class LineService {
     return this.client.replyMessage(replyToken, messages);
   }
 
-  // 發送衛教資源模板消息
+  // 發送衛教資源 Flex Message
   async sendHealthEducationResources(replyToken: string) {
-    const templateMessage = {
-      type: 'template' as const,
-      altText: '衛教資源',
-      template: {
-        type: 'buttons' as const,
-        title: '衛教資源',
-        text: '選擇您想了解的疾病衛教資訊',
-        actions: [
-          {
-            type: 'uri' as const,
-            label: '糖尿病',
-            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=糖尿病&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
-          },
-          {
-            type: 'uri' as const,
-            label: '高血脂',
-            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=高血脂&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
-          },
-          {
-            type: 'uri' as const,
-            label: '高血壓',
-            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=高血壓&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
-          },
-          {
-            type: 'uri' as const,
-            label: '癌症',
-            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=癌症&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
-          },
-          {
-            type: 'uri' as const,
-            label: '心臟病',
-            uri: 'https://health99.hpa.gov.tw/search?tab=0&keyword=心臟病&range=2000-01-01+%7E+2025-07-03&materialType=&releaseAgency=&releaseType=&sort=&startDate=2000-01-01&endDate=2025-07-03',
-          },
-          {
-            type: 'uri' as const,
-            label: '查詢其他健康資訊',
-            uri: 'https://health99.hpa.gov.tw/material',
-          },
-        ],
-      },
-    };
+    try {
+      // 第一張：慢性病
+      const chronicDiseaseMessage = {
+        type: 'template' as const,
+        altText: '慢性病衛教資源',
+        template: {
+          type: 'buttons' as const,
+          title: '慢性病',
+          text: '選擇您想了解的慢性病資訊',
+          actions: [
+            {
+              type: 'uri' as const,
+              label: '糖尿病',
+              uri: 'https://health99.hpa.gov.tw/search?keyword=%E7%B3%96%E5%B0%BF%E7%97%85'
+            },
+            {
+              type: 'uri' as const,
+              label: '高血壓',
+              uri: 'https://health99.hpa.gov.tw/search?keyword=%E9%AB%98%E8%A1%80%E5%A3%93'
+            },
+            {
+              type: 'uri' as const,
+              label: '高血脂',
+              uri: 'https://health99.hpa.gov.tw/search?keyword=%E9%AB%98%E8%A1%80%E8%84%82'
+            }
+          ]
+        }
+      };
 
-    return this.client.replyMessage(replyToken, templateMessage);
+      // 第二張：其他
+      const otherDiseaseMessage = {
+        type: 'template' as const,
+        altText: '其他疾病衛教資源',
+        template: {
+          type: 'buttons' as const,
+          title: '其他',
+          text: '選擇您想了解的其他疾病資訊',
+          actions: [
+            {
+              type: 'uri' as const,
+              label: '癌症',
+              uri: 'https://health99.hpa.gov.tw/search?keyword=%E7%99%8C%E7%97%87'
+            },
+            {
+              type: 'uri' as const,
+              label: '心臟病',
+              uri: 'https://health99.hpa.gov.tw/search?keyword=%E5%BF%83%E8%87%9F%E7%97%85'
+            },
+            {
+              type: 'uri' as const,
+              label: '更多衛教資訊',
+              uri: 'https://health99.hpa.gov.tw/material'
+            }
+          ]
+        }
+      };
+
+      // 發送兩個 template buttons 訊息
+      return await this.client.replyMessage(replyToken, [chronicDiseaseMessage, otherDiseaseMessage]);
+    } catch (error) {
+      console.error('發送衛教資源 Template Message 時發生錯誤:', error);
+
+      const fallbackMessage = {
+        type: 'text' as const,
+        text: `🏥 衛教資源連結：
+
+🩸 糖尿病：https://health99.hpa.gov.tw/search?keyword=糖尿病
+💓 高血壓：https://health99.hpa.gov.tw/search?keyword=高血壓
+🩺 高血脂：https://health99.hpa.gov.tw/search?keyword=高血脂
+🦠 癌症：https://health99.hpa.gov.tw/search?keyword=癌症
+❤️ 心臟病：https://health99.hpa.gov.tw/search?keyword=心臟病
+📚 更多資訊：https://health99.hpa.gov.tw/material
+
+資料來源：國民健康署`,
+      };
+
+      return await this.client.replyMessage(replyToken, fallbackMessage);
+    }
   }
+
 
   async replyMessage(replyToken: string, messages: Message[]) {
     return this.client.replyMessage(replyToken, messages);
