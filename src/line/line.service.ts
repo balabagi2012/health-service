@@ -98,7 +98,7 @@ export class LineService {
 
   // 建立用戶綁定訊息
   async createInitialSettingMessage(user: User) {
-    if (!user.name || !user.birthday || !user.gender || !user.height || user.chronicIllness.length === 0) {
+    if (!user.name || !user.birthday || !user.gender || !user.height) {
       const initialSettingMessage = {
         type: 'template' as const,
         altText: '用戶綁定',
@@ -190,6 +190,33 @@ export class LineService {
       initialMessage,
     ];
 
+    const menuMessage = {
+      type: 'template' as const,
+      altText: '選單',
+      template: {
+        type: 'buttons' as const,
+        title: '選單',
+        text: '選擇您想使用的功能',
+        actions: [
+          {
+            type: 'message' as const,
+            label: '上傳紀錄',
+            text: '上傳紀錄',
+          },
+          {
+            type: 'message' as const,
+            label: '健康報告',
+            text: '健康報告',
+          },
+          {
+            type: 'message' as const,
+            label: '衛教資源',
+            text: '衛教資源',
+          },
+        ],
+      },
+    };
+    messages.push(menuMessage);
     const user = await this.findOrCreateUser(userId);
     const initialSettingMessage = await this.createInitialSettingMessage(user);
     if (initialSettingMessage) {

@@ -1,6 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
+  Param,
   Post,
   Req,
   Res,
@@ -59,19 +62,37 @@ export class LineController {
     return { richMenuId };
   }
 
+  @Get('rich-menu')
+  async getRichMenu() {
+    const richMenus = await this.lineService.getRichMenuList();
+    return { richMenus };
+  }
+
   @Post('rich-menu/upload')
   @UseInterceptors(FileInterceptor('image'))
   async uploadRichMenuImage(
     @Body('richMenuId') richMenuId: string,
     @UploadedFile() file: any,
   ) {
-    await this.lineService.uploadRichMenuImage(richMenuId, file.buffer);
-    return { message: 'Rich menu image uploaded' };
+    try {
+      await this.lineService.uploadRichMenuImage(richMenuId, file.buffer);
+      return { message: 'Rich menu image uploaded' };
+    } catch (error) {
+      console.error(error);
+      return { message: 'Failed to upload rich menu image', error: error.message };
+    }
+
   }
 
   @Post('rich-menu/default')
   async setDefaultRichMenu(@Body('richMenuId') richMenuId: string) {
     await this.lineService.setDefaultRichMenu(richMenuId);
     return { message: 'Default rich menu set' };
+  }
+
+  @Delete('rich-menu/:richMenuId')
+  async deleteRichMenu(@Param('richMenuId') richMenuId: string) {
+    await this.lineService.deleteRichMenu(richMenuId);
+    return { message: 'Rich menu deleted' };
   }
 }
