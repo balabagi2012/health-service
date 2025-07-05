@@ -9,6 +9,7 @@ async function bootstrap() {
 
   // 啟用全域驗證管道
   app.useGlobalPipes(new ValidationPipe());
+  app.enableCors(); // 允許所有來源跨域
 
   // Swagger 配置
   const config = new DocumentBuilder()
