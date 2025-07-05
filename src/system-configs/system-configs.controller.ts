@@ -9,45 +9,69 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { SystemConfigsService } from './system-configs.service';
-import { SystemConfig } from './system-configs.schema';
+import { ApiTags, ApiBody, ApiResponse } from '@nestjs/swagger';
 
+import { SystemConfigsService } from './system-configs.service';
+import { CreateSystemConfigDto } from './dto/create-system-config.dto';
+import { UpdateSystemConfigDto } from './dto/update-system-config.dto';
+import { SystemConfigResponseDto } from './dto/system-config-response.dto';
+
+@ApiTags('system-configs')
 @Controller('system-configs')
 export class SystemConfigsController {
   constructor(private readonly systemConfigsService: SystemConfigsService) {}
 
   @Get()
-  async findAll(): Promise<SystemConfig[]> {
-    return this.systemConfigsService.findAll();
+  @ApiResponse({ status: 200, type: [SystemConfigResponseDto] })
+  async findAll(): Promise<SystemConfigResponseDto[]> {
+    const configs = await this.systemConfigsService.findAll();
+    return configs as any;
   }
 
   @Get(':key')
-  async findByKey(@Param('key') key: string): Promise<SystemConfig> {
+  @ApiResponse({ status: 200, type: SystemConfigResponseDto })
+  async findByKey(@Param('key') key: string): Promise<SystemConfigResponseDto> {
     const config = await this.systemConfigsService.findByKey(key);
     if (!config) {
       throw new HttpException('System config not found', HttpStatus.NOT_FOUND);
     }
-    return config;
+    return config as any;
   }
 
   @Post()
-  async create(@Body() createSystemConfigDto: Partial<SystemConfig>): Promise<SystemConfig> {
-    return this.systemConfigsService.create(createSystemConfigDto);
+  @ApiBody({ type: CreateSystemConfigDto })
+  @ApiResponse({ status: 201, type: SystemConfigResponseDto })
+  async create(
+    @Body() createSystemConfigDto: CreateSystemConfigDto,
+  ): Promise<SystemConfigResponseDto> {
+    const config = await this.systemConfigsService.create(
+      createSystemConfigDto,
+    );
+    return config as any;
   }
 
   @Put(':key')
+  @ApiBody({ type: UpdateSystemConfigDto })
+  @ApiResponse({ status: 200, type: SystemConfigResponseDto })
   async update(
     @Param('key') key: string,
-    @Body() updateSystemConfigDto: Partial<SystemConfig>,
-  ): Promise<SystemConfig> {
-    const config = await this.systemConfigsService.update(key, updateSystemConfigDto);
+    @Body() updateSystemConfigDto: UpdateSystemConfigDto,
+  ): Promise<SystemConfigResponseDto> {
+    const config = await this.systemConfigsService.update(
+      key,
+      updateSystemConfigDto,
+    );
     if (!config) {
       throw new HttpException('System config not found', HttpStatus.NOT_FOUND);
     }
-    return config;
+    return config as any;
   }
 
   @Delete(':key')
+  @ApiResponse({
+    status: 200,
+    schema: { example: { message: 'System config deleted successfully' } },
+  })
   async delete(@Param('key') key: string): Promise<{ message: string }> {
     const deleted = await this.systemConfigsService.delete(key);
     if (!deleted) {
@@ -55,4 +79,4 @@ export class SystemConfigsController {
     }
     return { message: 'System config deleted successfully' };
   }
-} 
+}

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -18,8 +19,9 @@ async function bootstrap() {
     .addTag('records', '記錄管理')
     .addTag('line', 'Line 機器人')
     .addTag('system-configs', '系統配置管理')
+    .addTag('auth', '認證管理')
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
