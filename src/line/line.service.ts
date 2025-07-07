@@ -302,7 +302,7 @@ export class LineService {
               },
               {
                 type: 'text',
-                text: '資料來源：原健署',
+                text: '資料來源：原健通',
                 size: 'xs',
                 color: '#AAAAAA',
                 align: 'center',
@@ -328,7 +328,7 @@ export class LineService {
   async checkTodayRecord(userId: string) {
     const records = await this.recordsService.findByDateRange(
       userId,
-      new Date(new Date().setDate(new Date().getDate() - 1)),
+      new Date(new Date().setHours(0, 0, 0, 0)),
       new Date(),
     );
     return records.length > 0 ? true : false;
