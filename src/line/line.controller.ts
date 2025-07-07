@@ -64,7 +64,10 @@ export class LineController {
           event.message.text.includes('衛教') ||
           event.message.text.includes('教育')
         ) {
-          await this.lineService.sendHealthEducationResources(event.replyToken);
+          await this.lineService.sendHealthEducationResources(
+            event.source.userId,
+            event.replyToken,
+          );
         } else if (event.message.text === '上傳紀錄') {
           await this.lineService.sendHealthRecordsMessage(
             event.source.userId,

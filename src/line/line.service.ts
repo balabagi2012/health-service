@@ -324,15 +324,20 @@ export class LineService {
     };
   }
 
-  // 發送填寫紀錄訊息
-  async sendHealthRecordsMessage(userId: string, replyToken: string) {
-    const user = await this.findOrCreateUser(userId);
-    const initialSettingMessage = await this.createInitialSettingMessage(user);
-    if (initialSettingMessage) {
-      return await this.client.pushMessage(userId, [initialSettingMessage]);
-    }
+  // 檢查本日是否已經填寫過紀錄
+  async checkTodayRecord(userId: string) {
+    const records = await this.recordsService.findByDateRange(
+      userId,
+      new Date(new Date().setDate(new Date().getDate() - 1)),
+      new Date(),
+    );
+    return records.length > 0 ? true : false;
+  }
 
+  // 建立填寫紀錄訊息
+  async createHealthRecordsMessage(userId: string) {
     // 從系統配置讀取健康紀錄訊息設定
+    const user = await this.findOrCreateUser(userId);
     const recordsConfig = await this.systemConfigsService.findByKey(
       'line_health_records_message',
     );
@@ -402,6 +407,17 @@ export class LineService {
         ],
       },
     };
+    return healthRecordsMessage;
+  }
+
+  // 發送填寫紀錄訊息
+  async sendHealthRecordsMessage(userId: string, replyToken: string) {
+    const user = await this.findOrCreateUser(userId);
+    const initialSettingMessage = await this.createInitialSettingMessage(user);
+    if (initialSettingMessage) {
+      return await this.client.pushMessage(userId, [initialSettingMessage]);
+    }
+    const healthRecordsMessage = await this.createHealthRecordsMessage(userId);
     return await this.client.replyMessage(replyToken, [healthRecordsMessage]);
   }
 
@@ -428,6 +444,10 @@ export class LineService {
         initialSettingMessage,
       ]);
     }
+    const isTodayRecord = await this.checkTodayRecord(userId);
+    if (!isTodayRecord) {
+      return await this.sendHealthRecordsMessage(userId, replyToken);
+    }
     const records = await this.recordsService.findByDateRange(
       userId,
       new Date(new Date().setDate(new Date().getDate() - 7)),
@@ -439,6 +459,7 @@ export class LineService {
     const message = (await this.generateHealthChartFlexGrouped(
       healthData,
     )) as FlexMessage;
+
     return await this.client.replyMessage(replyToken, [message]);
   }
 
@@ -511,9 +532,10 @@ export class LineService {
   }
 
   // 發送衛教資源 Flex Message
-  async sendHealthEducationResources(replyToken: string) {
+  async sendHealthEducationResources(userId: string, replyToken: string) {
     try {
       // 從系統配置讀取衛教資源設定
+      const messages: Message[] = [];
       const educationConfig = await this.systemConfigsService.findByKey(
         'line_health_education_resources',
       );
@@ -595,6 +617,8 @@ export class LineService {
         },
       };
 
+      messages.push(chronicDiseaseMessage);
+
       // 第二張：其他
       const otherDiseaseMessage = {
         type: 'template' as const,
@@ -611,11 +635,18 @@ export class LineService {
         },
       };
 
+      messages.push(otherDiseaseMessage);
+
+      const isTodayRecord = await this.checkTodayRecord(userId);
+      if (!isTodayRecord) {
+        const healthRecordsMessage = await this.createHealthRecordsMessage(
+          userId,
+        );
+        messages.push(healthRecordsMessage);
+      }
+
       // 發送兩個 template buttons 訊息
-      return await this.client.replyMessage(replyToken, [
-        chronicDiseaseMessage,
-        otherDiseaseMessage,
-      ]);
+      return await this.client.replyMessage(replyToken, messages);
     } catch (error) {
       console.error('發送衛教資源 Template Message 時發生錯誤:', error);
 
