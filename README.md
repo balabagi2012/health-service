@@ -37,10 +37,16 @@
 
 ### 技術架構
 - **後端框架**: NestJS (Node.js)
+  - NestJS 是一個現代化、模組化且高度可擴展的 Node.js 伺服器端應用框架，採用 TypeScript 開發，結合 OOP、FP 與 FRP 等設計理念。它讓開發大型、結構清晰的 API 變得更容易，並且有豐富的社群資源與官方文件。本專案用 NestJS 來實作 API、業務邏輯與資料存取。
 - **資料庫**: MongoDB (Mongoose ODM)
 - **API 文檔**: Swagger/OpenAPI
 - **第三方整合**: LINE Bot SDK
+  - LINE Messaging API 是 LINE 官方提供的聊天機器人開發介面，能讓系統主動或被動地與用戶互動，支援文字、圖片、按鈕等多種訊息格式。台灣用戶普及率高，適合推廣健康服務。本專案利用 LINE Messaging API 來推送健康提醒、收集紀錄、提供互動式選單等功能。
 - **開發工具**: TypeScript, ESLint, Prettier
+
+### 開發工具與技術選擇
+- **LINE Messaging API**：主要負責與用戶互動，適合台灣普及率高、各年齡層皆宜的通訊平台。
+- **Google Sheets**：簡化登入流程中的個人資料處理（如預約、回饋記錄等），方便管理。
 
 ---
 
